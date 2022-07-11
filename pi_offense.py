@@ -49,46 +49,87 @@ def offense():
     # define constant parameters
 
     # initialize serial port to Mega
-    ser = serial.Serial('/dev/ttyACM0', 115200, timeout=0.2)
+    ser = serial.Serial('/dev/ttyACM0', 115200)
     ser.reset_input_buffer()
 
     # initialize vectors
     x_k = [0.0]
 
-    terminate = False
-    while terminate == False:
-
+    k_step = 0
+    while k_step < 1:
         # 1) send actuator command
-        u_kb = u_to_bytes(u_k)
-        u_kb = 0x1A3F
+        # u_kb = u_to_bytes(u_k)
+        u_kb = 0x03
         ser.write(u_kb)
 
         # 2) receive sensor data
-        o_kb = ser.read(size=8)     # waits until n bytes are read from buffer
-        o_k = bytes_to_o(o_kb)
+        #   - Pi script waits at ser.read() for new byte in buffer (time set by Mega delay())
+        #       - when size=2, waits two cycles to collect both bytes before continuing on, output is 2 bytes
+        
+        # completed:
+        # - able to send multiple bytes from Mega to Pi, come in correct order
+        # - able to parse multiple bytes into an int
+
+        # TO-DO:
+        #   - send data to Mega, have it respond
+
+        # ISSUE: gets hung up at ser.read()
+        #   - does buffer on Pi and/or Mega get filled with wrong thing? (request vs reply)
+        #       - looks like Pi possibly printed its own request as a reply
+        #   - does message get missed because it gets sent so fast?
+        #   - either:
+        #       - 1) Mega never gets past Serial.readBytes() -> think this is more likely due to avrdude error
+        #       - 2) Pi never gets past ser.read()
+        #   - Mega giving "avrdude: stk500v2_ReceiveMessage(): timeout" error
+        #       - is timeout occuring on Serial.available()==0 or Serial.readBytes()? feel like it has to be readBytes()
+        #   - need to clean up serial port?
+        #   - looks like Mega has trouble on Serial.readBytes()
+        #   - able to respond to input in the serial monitor
+        #   - Mega Serial.println() is properly printing hex values
+        #   - make sure there's no assumed default line ending or something like that
+        #   - doesn't seem like Serial.read() is taking value properly (but seems to receive something)
+
+        # o_kb = ser.read(size=1)    # waits until n bytes are read from buffer
+        # o_int = int.from_bytes(o_kb, "little", signed=False) 
+
+        # print(o_kb)
+        # print(o_int)
+        # o_k = bytes_to_o(o_kb)
 
         # 3) estimate state
-        x_k = estimate_state(o_k)
+        # x_k = estimate_state(o_k)
 
         # NOTE: might combine #4-6 or #5-6 to keep each mode's operation closer together
         # 4) update mode
-        m_k = update_mode(x_k)
+        # m_k = update_mode(x_k, o_k)
 
         # 5) update guidance
 
         # 6) calculate input
 
+        k_step += 1
+
     return
+
+# estimates state vector from sensor observations
+def estimate_state(o_k):
+    x_k = 0
+    return x_k
+
+# updates operating mode based on state and observation
+def update_mode(x_k, o_k):
+    m_k = 0
+    return m_k
 
 # converts input vector to byte package for sending to Mega
-def u_to_bytes(u):
-
-    return
+def u_to_bytes(u_k):
+    u_kb = 0
+    return u_kb
 
 # converts byte package received from Mega into sensor observations
-def bytes_to_o(o_b):
-
-    return
+def bytes_to_o(o_kb):
+    o_k = 0
+    return o_k
 
 if __name__ == "__main__":
     offense()
