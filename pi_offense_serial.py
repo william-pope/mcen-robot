@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 
-from smbus import SMBus
+import serial
 import time
-
-mega_addr = 0x1a
-mega_reg = 0x00
 
 # terminology:
 #   - x_k: state
@@ -51,22 +48,53 @@ mega_reg = 0x00
 def offense():
     # define constant parameters
 
-    # initialize I2C bus
-    i2c = SMBus(1)
+    # initialize serial port to Mega
+    ser = serial.Serial('/dev/ttyACM0', 115200)
+    ser.reset_input_buffer()
 
     # initialize vectors
     x_k = [0.0]
 
     k_step = 0
-    while k_step < 1:
+    while k_step < 5:
         # 1) send actuator command
-        u_k = [100, 100, 100, 100, 0]
-        u_kb = u_to_bytes(u_k)
-        i2c.write_block_data(mega_addr, mega_reg, u_kb)
+        # u_kb = u_to_bytes(u_k)
+        # u_kb = 0x03
+        # ser.write(u_kb)
 
         # 2) receive sensor data
-        o_kb = i2c.read_i2c_block_data(mega_addr, mega_reg, 3)
-        o_k = bytes_to_o(o_kb)
+        #   - Pi script waits at ser.read() for new byte in buffer (time set by Mega delay())
+        #       - when size=2, waits two cycles to collect both bytes before continuing on, output is 2 bytes
+        
+        # completed:
+        # - able to send multiple bytes from Mega to Pi, come in correct order
+        # - able to parse multiple bytes into an int
+
+        # TO-DO:
+        #   - send data to Mega, have it respond
+
+        # ISSUE: gets hung up at ser.read()
+        #   - does buffer on Pi and/or Mega get filled with wrong thing? (request vs reply)
+        #       - looks like Pi possibly printed its own request as a reply
+        #   - does message get missed because it gets sent so fast?
+        #   - either:
+        #       - 1) Mega never gets past Serial.readBytes() -> think this is more likely due to avrdude error
+        #       - 2) Pi never gets past ser.read()
+        #   - Mega giving "avrdude: stk500v2_ReceiveMessage(): timeout" error
+        #       - is timeout occuring on Serial.available()==0 or Serial.readBytes()? feel like it has to be readBytes()
+        #   - need to clean up serial port?
+        #   - looks like Mega has trouble on Serial.readBytes()
+        #   - able to respond to input in the serial monitor
+        #   - Mega Serial.println() is properly printing hex values
+        #   - make sure there's no assumed default line ending or something like that
+        #   - doesn't seem like Serial.read() is taking value properly (but seems to receive something)
+
+        o_kb = ser.read(size=1)    # waits until n bytes are read from buffer
+        # o_int = int.from_bytes(o_kb, "little", signed=False) 
+
+        print(o_kb)
+        # print(o_int)
+        # o_k = bytes_to_o(o_kb)
 
         # 3) estimate state
         # x_k = estimate_state(o_k)
@@ -79,7 +107,6 @@ def offense():
 
         # 6) calculate input
 
-        time.sleep(1)
         k_step += 1
 
     return
@@ -96,14 +123,7 @@ def update_mode(x_k, o_k):
 
 # converts input vector to byte package for sending to Mega
 def u_to_bytes(u_k):
-    p_m1_b = int(255/300 * u_k[0]).to_bytes(2, "little", signed=True)
-    p_m2_b = int(255/300 * u_k[1]).to_bytes(2, "little", signed=True)
-    p_m3_b = int(255/300 * u_k[2]).to_bytes(2, "little", signed=True)
-    p_m4_b = int(255/300 * u_k[3]).to_bytes(2, "little", signed=True)
-
-    o_sol_b = u_k[4]
-
-    u_kb = [p_m1_b[0], p_m1_b[1], p_m2_b[0], p_m2_b[1], p_m3_b[0], p_m3_b[1], p_m4_b[0], p_m4_b[1], o_sol_b]
+    u_kb = 0
     return u_kb
 
 # converts byte package received from Mega into sensor observations
