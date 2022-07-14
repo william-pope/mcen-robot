@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from smbus import SMBus
+from smbus2 import SMBus
 import time
 import copy
 import numpy as np
@@ -52,30 +52,38 @@ mega_reg = 0x00
 
 # (?): should create data classes for x, u, o? fields have different data types, so difficult to hold in single array
 
+# Errno 5 Input/output error
+# Errno 121 Remote I/O error
+
 def offense():
     # define constant parameters
-    Dt = 0.5    # [s], period of main loop
+    Dt = 0.1   # [s], period of main loop
     # TO-DO: would like to define a dataclass to hold constants in a struct (or just define as globals?)
 
     # initialize I2C bus
     i2c = SMBus(1)
 
     # initialize vectors
-    mode_k = 0
+    mode_k = 9
 
     rpm_k = np.zeros(4)
     shoot_k = 0
-    act_k = [rpm_k, shoot_k]
+    act_k = np.append(rpm_k, shoot_k)
 
     k_step = 0
-    while k_step < 1:
+    while k_step < 10:
         # 1) send actuator command
+        print("write")
         act_kb = u_to_bytes(act_k)
         i2c.write_block_data(mega_addr, mega_reg, act_kb)
 
         # 2) receive sensor data
-        obs_kb = i2c.read_i2c_block_data(mega_addr, mega_reg, 3)
+        print("read")
+        obs_kb = i2c.read_i2c_block_data(mega_addr, mega_reg, 9)
         obs_k = bytes_to_o(obs_kb)
+
+        print(obs_kb)
+        print(obs_k)
 
         # 3) enter mode operate
         shoot_k1 = 0
@@ -90,8 +98,12 @@ def offense():
         elif mode_k == 4:
             mode_k1, rpm_k1, shoot_k1 = operate_m4(obs_k)
 
-        # TO-DO: see if this concatenates properly
-        act_k1 = [rpm_k1, shoot_k1]
+        if mode_k == 9:
+            mode_k1 = 9
+            rpm_k1 = 50*np.ones(4)
+            shoot_k1 = 0
+
+        act_k1 = np.append(rpm_k1, shoot_k1)
 
         mode_k = copy.deepcopy(mode_k1)
         act_k = copy.deepcopy(act_k1)
@@ -259,7 +271,7 @@ def u_to_bytes(act_k):
     p_m3_b = int(255/300 * act_k[2]).to_bytes(2, "little", signed=True)
     p_m4_b = int(255/300 * act_k[3]).to_bytes(2, "little", signed=True)
 
-    o_sol_b = act_k[4]
+    o_sol_b = int(act_k[4])
 
     act_kb = [p_m1_b[0], p_m1_b[1], p_m2_b[0], p_m2_b[1], p_m3_b[0], p_m3_b[1], p_m4_b[0], p_m4_b[1], o_sol_b]
     return act_kb

@@ -3,7 +3,7 @@
 #define I2C_MEGA_ADDR 0x1a
 
 byte cmd_buffer[9];
-byte data_buffer[9];
+byte data_buffer[3];
 
 void setup() {
   Wire.begin(I2C_MEGA_ADDR);
