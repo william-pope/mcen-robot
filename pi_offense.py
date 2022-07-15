@@ -52,9 +52,6 @@ mega_reg = 0x00
 
 # (?): should create data classes for x, u, o? fields have different data types, so difficult to hold in single array
 
-# Errno 5 Input/output error
-# Errno 121 Remote I/O error
-
 def offense():
     # define constant parameters
     Dt = 0.1   # [s], period of main loop
@@ -62,6 +59,7 @@ def offense():
 
     # initialize I2C bus
     i2c = SMBus(1)
+    time.sleep(1)
 
     # initialize vectors
     mode_k = 9
@@ -71,42 +69,51 @@ def offense():
     act_k = np.append(rpm_k, shoot_k)
 
     k_step = 0
-    while k_step < 10:
+    while k_step < 3:
+        print(k_step)
+
         # 1) send actuator command
-        print("write")
-        act_kb = u_to_bytes(act_k)
+        # act_kb = u_to_bytes(act_k)
+        act_kb = [0x1f, 0x34]
         i2c.write_block_data(mega_addr, mega_reg, act_kb)
 
         # 2) receive sensor data
-        print("read")
-        obs_kb = i2c.read_i2c_block_data(mega_addr, mega_reg, 9)
+        while True:
+            try:
+                obs_kb = i2c.read_i2c_block_data(mega_addr, mega_reg, 2)
+            except:
+                print("i2c error, trying again")
+                continue
+            else:
+                break
+
         obs_k = bytes_to_o(obs_kb)
 
         print(obs_kb)
         print(obs_k)
+        
+        # # 3) enter mode operate
+        # shoot_k1 = 0
+        # if mode_k == 0:
+        #     mode_k1, rpm_k1, theta_targ = operate_m0(obs_k)
+        # elif mode_k == 1:
+        #     mode_k1, rpm_k1 = operate_m1(obs_k, theta_targ)
+        # elif mode_k == 2:
+        #     mode_k1, rpm_k1 = operate_m2(obs_k)
+        # elif mode_k == 2:
+        #     mode_k1, rpm_k1 = operate_m3(obs_k)
+        # elif mode_k == 4:
+        #     mode_k1, rpm_k1, shoot_k1 = operate_m4(obs_k)
 
-        # 3) enter mode operate
-        shoot_k1 = 0
-        if mode_k == 0:
-            mode_k1, rpm_k1, theta_targ = operate_m0(obs_k)
-        elif mode_k == 1:
-            mode_k1, rpm_k1 = operate_m1(obs_k, theta_targ)
-        elif mode_k == 2:
-            mode_k1, rpm_k1 = operate_m2(obs_k)
-        elif mode_k == 2:
-            mode_k1, rpm_k1 = operate_m3(obs_k)
-        elif mode_k == 4:
-            mode_k1, rpm_k1, shoot_k1 = operate_m4(obs_k)
+        # if mode_k == 9:
+        #     mode_k1 = 9
+        #     rpm_k1 = 50*np.ones(4)
+        #     shoot_k1 = 0
 
-        if mode_k == 9:
-            mode_k1 = 9
-            rpm_k1 = 50*np.ones(4)
-            shoot_k1 = 0
+        # act_k1 = np.append(rpm_k1, shoot_k1)
 
-        act_k1 = np.append(rpm_k1, shoot_k1)
-
-        mode_k = copy.deepcopy(mode_k1)
-        act_k = copy.deepcopy(act_k1)
+        # mode_k = copy.deepcopy(mode_k1)
+        # act_k = copy.deepcopy(act_k1)
         k_step += 1
 
         time.sleep(Dt)
@@ -212,11 +219,11 @@ def operate_m2(obs_k, x_dr_k):
 # mode 3: set distance (fine)
 def operate_m3(obs_k):
     mode_k1 = 3
-    x_rel_targ = [8.1, 5.6]
-    x_rel_tol = 1
+    x_rel_targ = [78.1, -65.6]  # [mm], distance from robot center to ball center
+    x_rel_tol = 1.5             # [mm], allowable error
 
     # OBS: calculate relative x-y position from range sensors data
-    x_rel_ball = [12, 8]
+    x_rel_ball = estimate_m3_rel(obs_k)
 
     # MODE: if at target position, move on to next mode
     if abs(x_rel_ball[0] - x_rel_targ[0]) <= x_rel_tol and abs(x_rel_ball[1] - x_rel_targ[1]) <= x_rel_tol:
@@ -238,6 +245,10 @@ def operate_m4(obs_k):
     shoot_k1 = True
     
     return mode_k1, rpm_k1, shoot_k1
+
+def estimate_m3_rel(obs_k):
+
+    return x_rel_ball
 
 def control_m1_translate(v_ball, v_left_post, v_right_post, theta_targ):
     rpm_k1 = np.zeros(4)
@@ -276,10 +287,15 @@ def u_to_bytes(act_k):
     act_kb = [p_m1_b[0], p_m1_b[1], p_m2_b[0], p_m2_b[1], p_m3_b[0], p_m3_b[1], p_m4_b[0], p_m4_b[1], o_sol_b]
     return act_kb
 
-# TO-DO:
 # converts byte package received from Mega into sensor observations
 def bytes_to_o(obs_kb):
-    obs_k = 0
+    obs_kba = bytearray(obs_kb)
+
+    # split byte array into values
+    test = int.from_bytes(obs_kba[0:2], "little", signed=True)
+
+    obs_k = [test]
+
     return obs_k
 
 if __name__ == "__main__":
