@@ -4,30 +4,36 @@
 #include <NewPing.h>
 #include <SparkFun_TB6612.h>
 
+
+
+
+// I2C COMM
+
 #define I2C_MEGA_ADDR 0x1a
 
 // MOTORS
+// m1
+#define LTS 2 //Left top motor
+#define LT1 4 //B01
+#define LT2 3 //B02
 
-#define RBS 6 //Right bottom motor
-#define RB1 26 //A11
-#define RB2 27 //A12
+// m2
+#define RTS 7 //Right top motor
+#define RT1 5 //A01
+#define RT2 6 //A02
 
-// motor two
-#define LBS 3    //Left bottom motor
-#define LB1 34 //B11
-#define LB2 32 //B12
+// m3
+#define LBS 13 //Left bottom motor
+#define LB1 11 //B11
+#define LB2 12 //B12
 
-// motor three
-#define RTS 13    //Right top motor
-#define RT1 10 //A01
-#define RT2 11 //A02
+// m4
+#define RBS 8  //Right bottom motor
+#define RB1 10 //A11
+#define RB2 9  //A12
 
-// motor four
-#define LTS 9    //Left top motor
-#define LT1 8 //B01
-#define LT2 7 //B02
+#define STNDBY 22 //Connected to VCC
 
-#define STNDBY 38
 
 const int offsetRB = -1;
 const int offsetLB = 1;
@@ -42,7 +48,7 @@ const int offsetLT = 1;
 
 // SOLENOID
 
-#define SolPin 47 
+#define SolPin 36
 
 // other
 
@@ -79,7 +85,7 @@ void setup()
   // I2C
   Wire.begin(I2C_MEGA_ADDR);
   Wire.onReceive(receiveData);
-  Wire.onRequest(sendData);
+//  Wire.onRequest(send/Data);
 
   Serial.begin(115200);
 

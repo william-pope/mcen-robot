@@ -64,12 +64,12 @@ mega_reg = 0x00
 
 def offense():
     # define constant parameters
-    Dt = 0.1   # [s], period of main loop
+    Dt = 0.5   # [s], period of main loop
     # TO-DO: would like to define a dataclass to hold constants in a struct (or just define as globals?)
 
     # initialize I2C bus
     i2c = SMBus(1)
-    time.sleep(1)
+    time.sleep(2)
 
     # initialize vectors
     mode_k = 9
@@ -87,16 +87,17 @@ def offense():
         i2c.write_block_data(mega_addr, mega_reg, act_kb)
 
         # 2) receive sensor data
-        while True:
-            try:
-                obs_kb = i2c.read_i2c_block_data(mega_addr, mega_reg, 2)
-            except:
-                print("i2c error, trying again")
-                continue
-            else:
-                break
+        # obs_kb = i2c.read_i2c_block_data(mega_addr, mega_reg, 2)
+        # while True:
+        #     try:
+        #         obs_kb = i2c.read_i2c_block_data(mega_addr, mega_reg, 2)
+        #     except:
+        #         print("i2c error, trying again")
+        #         continue
+        #     else:
+        #         break
 
-        obs_k = bytes_to_o(obs_kb)
+        # obs_k = bytes_to_o(obs_kb)
         
         # 3) enter mode operate
         shoot_k1 = 0
@@ -114,7 +115,7 @@ def offense():
         # test mode
         if mode_k == 9:
             mode_k1 = 9
-            rpm_k1 = 50*np.ones(4)
+            rpm_k1 = 30*np.ones(4)
             shoot_k1 = 0
 
         act_k1 = np.append(rpm_k1, shoot_k1)
