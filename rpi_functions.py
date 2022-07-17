@@ -37,14 +37,16 @@ def control_m2_fwd(x_dr_k, x_ref):
 
     return rpm_k1 
 
+# TO-DO:
 # use range sensor measurements and vehicle geometry to calculate relative position of ball
-def estimate_m3_rel(obs_k):
+def estimate_m3_ball(obs_k):
 
     x_rel_ball = [10, 10]
 
     return x_rel_ball
 
-def control_m3_rel(x_rel_ball, x_rel_targ):
+# TO-DO:
+def control_m3_translate(dx_rel):
     rpm_k1 = np.zeros(4)
 
     return rpm_k1 
@@ -119,8 +121,18 @@ def bytes_to_o(obs_kb):
     obs_kba = bytearray(obs_kb)
 
     # split byte array into values
-    test = int.from_bytes(obs_kba[0:2], "little", signed=True)
+    uss1 = int.from_bytes(obs_kba[0:2], "little", signed=True)
+    uss2 = int.from_bytes(obs_kba[2:4], "little", signed=True)
+    v_ball = int.from_bytes(obs_kba[4:6], "little", signed=True)
+    w_ball = int.from_bytes(obs_kba[6:8], "little", signed=True)
+    v_goalie = int.from_bytes(obs_kba[8:10], "little", signed=True)
+    w_goalie = int.from_bytes(obs_kba[10:12], "little", signed=True)
+    v_left_post = int.from_bytes(obs_kba[12:14], "little", signed=True)
+    w_left_post = int.from_bytes(obs_kba[14:16], "little", signed=True)
+    v_right_post = int.from_bytes(obs_kba[16:18], "little", signed=True)
+    w_right_post = int.from_bytes(obs_kba[18:20], "little", signed=True)
+    tone = int.from_bytes(obs_kba[20], "little", signed=True)
 
-    obs_k = [test]
+    obs_k = [uss1, uss2, v_ball, w_ball, v_goalie, w_goalie, v_left_post, w_left_post, v_right_post, w_right_post, tone]
 
     return obs_k
