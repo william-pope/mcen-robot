@@ -19,7 +19,7 @@ mega_reg = 0x00
 
 def offense():
     # define constant parameters
-    Dt = 0.5   # [s], period of main loop
+    Dt = 0.25   # [s], period of main loop
     # TO-DO: would like to define a dataclass to hold constants in a struct (or just define as globals?)
 
     # initialize I2C bus
@@ -73,7 +73,7 @@ def offense():
         # test mode
         if mode_k == 9:
             mode_k1 = 9
-            rpm_k1 = 30*np.ones(4)
+            rpm_k1 = 0*np.ones(4)
             shoot_k1 = 0
 
         act_k1 = np.append(rpm_k1, shoot_k1)
@@ -88,7 +88,7 @@ def offense():
 
 # TO-DO: make sure if...elif logic works properly, not meeting multiple criteria
 
-# mode 0: acquire environment
+# mode 0: pre-whistle
 def operate_m0(obs_k):
     mode_k1 = 0
 
@@ -102,7 +102,7 @@ def operate_m0(obs_k):
     # calculate best shot
     target = "right"
 
-    # MODE: if whistle delay has passed, move on to next mode   # TO-DO: need to store t_w outside function in order to reference in subsequest calls
+    # MODE: if whistle delay has passed, move on to next mode   # TO-DO: need to store t_w outside function in order to reference in subsequent calls
     if time.now() - t_w >= 0:
         mode_k1 = 1
         rpm_k1 = np.zeros(4)
@@ -123,32 +123,27 @@ def operate_m1(obs_k, target):
     targ_tol = 10       # [px]
     v_targ_offset = 30  # [px]
 
-    # OBS: calculate current theta from CV observations
-    # v_ball = obs_k[6]
-    # v_left_post = obs_k[8]
-    # v_right_post = obs_k[10]
-    v_ball = 0
-    v_left_post = -100
-    v_right_post = 100
+    # OBS: process Pixy data
+    v_ball = obs_k[2]
+    v_left_post = obs_k[4]
+    v_right_post = obs_k[6]
 
     if target == "left":
         dv_targ = (v_left_post + v_targ_offset) - v_ball
 
-        if v_left_post == 0:    # if post not recognized
-            mode_k1 = 1
+        if v_left_post == 0:    # if post not recognized, stop and repeat loop
             rpm_k1 = np.zeros(4)
             return mode_k1, rpm_k1
     elif target == "right":
         dv_targ = (v_right_post - v_targ_offset) - v_ball
 
-        if v_right_post == 0:   # if post not recognized
-            mode_k1 = 1
+        if v_right_post == 0:   # if post not recognized, stop and repeat loop
             rpm_k1 = np.zeros(4)
             return mode_k1, rpm_k1
 
     # MODE: if aligned with target, move on to next mode
     if abs(v_ball) <= cent_tol and abs(dv_targ) <= targ_tol:
-        mode_k1 = 2
+        mode_k1 = 9     # TEST: end run
         rpm_k1 = np.zeros(4)
         return mode_k1, rpm_k1
 

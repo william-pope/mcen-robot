@@ -40,6 +40,13 @@ def control_m2_fwd(x_dr_k, x_ref):
 # TO-DO:
 # use range sensor measurements and vehicle geometry to calculate relative position of ball
 def estimate_m3_ball(obs_k):
+    r_ball_at_h = 80
+
+    u1_pos_bf = [50, 50, -np.pi/4]
+    u2_pos_bf = [45, -50, -np.pi/12]
+
+    u1_meas = obs_k[0]
+    u2_meas = obs_k[1]
 
     x_rel_ball = [10, 10]
 
@@ -51,13 +58,14 @@ def control_m3_translate(dx_rel):
 
     return rpm_k1 
 
-def control_m6_translate(v_ball):
-    if v_ball >= 0:
+def control_m6_translate(dv_block):
+    if dv_block >= 0:
         direction = "right"
-    elif v_ball < 0:
+    elif dv_block < 0:
         direction = "left"
 
-    rpm_k1 = mec_translate(200, direction)
+    # TO-DO: scale speed proportionally to ball distance
+    rpm_k1 = mec_translate(100, direction)
 
     return rpm_k1
 
@@ -121,18 +129,24 @@ def bytes_to_o(obs_kb):
     obs_kba = bytearray(obs_kb)
 
     # split byte array into values
-    uss1 = int.from_bytes(obs_kba[0:2], "little", signed=True)
-    uss2 = int.from_bytes(obs_kba[2:4], "little", signed=True)
+    u1 = int.from_bytes(obs_kba[0:2], "little", signed=True)
+    u2 = int.from_bytes(obs_kba[2:4], "little", signed=True)
+
     v_ball = int.from_bytes(obs_kba[4:6], "little", signed=True)
     w_ball = int.from_bytes(obs_kba[6:8], "little", signed=True)
-    v_goalie = int.from_bytes(obs_kba[8:10], "little", signed=True)
-    w_goalie = int.from_bytes(obs_kba[10:12], "little", signed=True)
-    v_left_post = int.from_bytes(obs_kba[12:14], "little", signed=True)
-    w_left_post = int.from_bytes(obs_kba[14:16], "little", signed=True)
-    v_right_post = int.from_bytes(obs_kba[16:18], "little", signed=True)
-    w_right_post = int.from_bytes(obs_kba[18:20], "little", signed=True)
-    tone = int.from_bytes(obs_kba[20], "little", signed=True)
 
-    obs_k = [uss1, uss2, v_ball, w_ball, v_goalie, w_goalie, v_left_post, w_left_post, v_right_post, w_right_post, tone]
+    v_left_post = int.from_bytes(obs_kba[8:10], "little", signed=True)
+    w_left_post = int.from_bytes(obs_kba[10:12], "little", signed=True)
+    v_right_post = int.from_bytes(obs_kba[12:14], "little", signed=True)
+    w_right_post = int.from_bytes(obs_kba[14:16], "little", signed=True)
+
+    v_yellow = int.from_bytes(obs_kba[16:18], "little", signed=True)
+    w_yellow = int.from_bytes(obs_kba[18:20], "little", signed=True)
+    v_blue = int.from_bytes(obs_kba[20:22], "little", signed=True)
+    w_blue = int.from_bytes(obs_kba[22:24], "little", signed=True)
+
+    tone = int.from_bytes(obs_kba[24], "little", signed=True)
+
+    obs_k = [u1, u2, v_ball, w_ball, v_left_post, w_left_post, v_right_post, v_yellow, w_yellow, v_blue, w_blue, w_right_post, tone]
 
     return obs_k
