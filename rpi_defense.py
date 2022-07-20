@@ -36,7 +36,9 @@ def defense():
         # 2) receive sensor data
         ser.write(1)
         obs_kb = ser.read(size=25)
-        obs_k = bytes_to_o(obs_kb)
+        print(obs_kb)
+
+        # obs_k = bytes_to_o(obs_kb)
         
         # 3) enter mode operate
         if mode_k == 5:

@@ -70,10 +70,11 @@ unsigned int samplingPeriod = round(1000000*(1.0/SAMPLING_FREQUENCY)); //Period 
 
 // Initialize buffers
 
-byte req_buffer[9];
-byte rpl_buffer[9];
-
 #define ACT_REQ_LENGTH 9
+#define OBS_RPL_LENGTH 25
+
+byte act_req_buffer[ACT_REQ_LENGTH];
+byte obs_rpl_buffer[OBS_RPL_LENGTH];
 
 
 void setup() 
@@ -98,95 +99,97 @@ void loop() {
   }
 }
 
-void act_request(byte req_buffer) {  
-  int p_m1 = (req_buffer[3] << 8) + req_buffer[2];
-  int p_m2 = (req_buffer[5] << 8) + req_buffer[4];
-  int p_m3 = (req_buffer[7] << 8) + req_buffer[6];
-  int p_m4 = (req_buffer[9] << 8) + req_buffer[8];
-  bool solState = req_buffer[10];
+void act_request(byte req_buffer) {    
+  int p_m1 = (req_buffer[1] << 8) + req_buffer[0];
+  int p_m2 = (req_buffer[3] << 8) + req_buffer[2];
+  int p_m3 = (req_buffer[5] << 8) + req_buffer[4];
+  int p_m4 = (req_buffer[7] << 8) + req_buffer[6];
+  bool solState = req_buffer[8];
 
-  setMotors(p_m1, p_m2, p_m3, p_m4);
-  setSolenoid(solState);
+//  setMotors(p_m1, p_m2, p_m3, p_m4);
+//  setSolenoid(solState);
 
   Serial.write(1);
 }
 
 void obs_request() {
-  // ultra sonic sensor 1
-  int d_r0 = getRange(0);
-  data_buffer[0] = d_r0;
-  data_buffer[1] = d_r0 << 8;
+//  // ultra sonic sensor 1
+//  int d_r0 = getRange(0);
+//  obs_rpl_buffer[0] = d_r0;
+//  obs_rpl_buffer[1] = d_r0 << 8;
+//
+//  // ultra sonic sensor 2
+//  int d_r1 = getRange(1);
+//  obs_rpl_buffer[2] = d_r1;
+//  obs_rpl_buffer[3] = d_r1 << 8;
+//
+//  int m_x;
+//  int m_y;
+//
+//  // pixy - ball position
+//  m_x = getPixy(1,0);
+//  obs_rpl_buffer[4] = m_x;
+//  obs_rpl_buffer[5] = m_x << 8;
+//  
+//  m_y = getPixy(1,1);
+//  obs_rpl_buffer[6] = m_y;
+//  obs_rpl_buffer[7] = m_y << 8;
+//
+//  // pixy - left post
+//  m_x = getPixy(2,0);
+//  obs_rpl_buffer[8] = m_x;
+//  obs_rpl_buffer[9] = m_x << 8;
+//  
+//  m_y = getPixy(2,1);
+//  obs_rpl_buffer[10] = m_y;
+//  obs_rpl_buffer[11] = m_y << 8;
+//
+//  // pixy - right post
+//  m_x = getPixy(3,0);
+//  obs_rpl_buffer[12] = m_x;
+//  obs_rpl_buffer[13] = m_x << 8;
+//  
+//  m_y = getPixy(3,1);
+//  obs_rpl_buffer[14] = m_y;
+//  obs_rpl_buffer[15] = m_y << 8;
+//
+//  // pixy - gk yellow
+//  m_x = getPixy(4,0);
+//  obs_rpl_buffer[16] = m_x;
+//  obs_rpl_buffer[17] = m_x << 8;
+//  
+//  m_y = getPixy(4,1);
+//  obs_rpl_buffer[18] = m_y;
+//  obs_rpl_buffer[19] = m_y << 8;
+//
+//  // pixy - gk blue
+//  m_x = getPixy(5,0);
+//  obs_rpl_buffer[20] = m_x;
+//  obs_rpl_buffer[21] = m_x << 8;
+//  
+////  m_y = getPixy(5,1);
+//  obs_rpl_buffer[22] = m_y;
+//  obs_rpl_buffer[23] = m_y << 8;
+//
+//  // start tone
+//  bool s_t;
+//  s_t = getStart();
+//  obs_rpl_buffer[24] = s_t;
 
-  // ultra sonic sensor 2
-//  int d_r1 = getRange(1);/
-  int d_r1 = 230;
-  data_buffer[2] = d_r1;
-  data_buffer[3] = d_r1 << 8;
-
-  // pixy - ball position
-  int m1_x = getPixy(1,0);
-  data_buffer[4] = m1_x;
-  data_buffer[5] = m1_x << 8;
-  int m1_y = getPixy(1,1);
-  data_buffer[6] = m1_y;
-  data_buffer[7] = m1_y << 8;
-
-  int m_x;
-  int m_y;
+  byte test_rpl_buffer[25] = {0};
+  Serial.write(test_rpl_buffer, 25);
   
-  // pixy - left post
-  m_x = getPixy(2,0);
-  data_buffer[8] = m_x;
-  data_buffer[9] = m_x << 8;
-  m_y = getPixy(2,1);
-  data_buffer[10] = m_y;
-  data_buffer[11] = m_y << 8;
-
-  // pixy - right post
-  m_x = getPixy(3,0);
-  data_buffer[12] = m_x;
-  data_buffer[13] = m_x << 8;
-  m_y = getPixy(3,1);
-  data_buffer[14] = m_y;
-  data_buffer[15] = m_y << 8;
-
-  // pixy - gk yellow
-  m_x = getPixy(4,0);
-  data_buffer[16] = m_x;
-  data_buffer[17] = m_x << 8;
-  m_y = getPixy(4,1);
-  data_buffer[18] = m_y;
-  data_buffer[19] = m_y << 8;
-
-  // pixy - gk blue
-  m_x = getPixy(5,0);
-  data_buffer[20] = m_x;
-  data_buffer[21] = m_x << 8;
-  m_y = getPixy(5,1);
-  data_buffer[22] = m_y;
-  data_buffer[23] = m_y << 8;
-
-  // start tone
-  bool s_t;
-  s_t = getStart();
-  data_buffer[24] = s_t;
-
-  Serial.write(data_buffer, 25);
+//  Serial.write(obs_rpl_buffer, 25);
 }
 
-void setMotors(int p_m1,int p_m2,int p_m3,int p_m4) 
-{
-
-  // Probably need to make Motor variables (RB,LB,RT,LT) global
+void setMotors(int p_m1,int p_m2,int p_m3,int p_m4) {
   RB.drive(p_m1);
   LB.drive(p_m2);
   RT.drive(p_m3);
   LT.drive(p_m3);
-
 }
 
-void setSolenoid(bool solState) 
-{
+void setSolenoid(bool solState) {
   if (solState == 1) {
     digitalWrite(SolPin, HIGH);
   } else {
@@ -197,10 +200,10 @@ void setSolenoid(bool solState)
 
 
 int getRange(int ID) {
-
   //sending data in mm
   int distance = sonar[ID].ping_median(5) * factor * 10; 
   delay(60);  
+  
   return distance;
 }
 
@@ -220,7 +223,6 @@ int getPixy(int SIG, int ID) //ID - 0:x and 1:y, Sig - signature of blocl
     // grab blocks!
     pixy.ccc.getBlocks();
     
-    // If there are detect blocks, print them!
     if (pixy.ccc.numBlocks)
     {
       for (i=0; i<pixy.ccc.numBlocks; i++)
@@ -277,7 +279,6 @@ bool getStart()
 
   /*Find peak frequency and print peak*/
   double peak = FFT.MajorPeak(vReal, SAMPLES, SAMPLING_FREQUENCY);
-//  Serial.println(peak);     //Print out the most dominant frequency.
 
   if (peak>startFreq) 
   {
