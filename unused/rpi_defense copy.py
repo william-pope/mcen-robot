@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import serial
+from smbus2 import SMBus
 import time
 import copy
 import numpy as np
@@ -15,8 +15,9 @@ def defense():
     Dt = 0.25  # [s], period of main loop
     # TO-DO: would like to define a dataclass to hold constants in a struct (or just define as globals?)
 
-    ser = serial.Serial('/dev/ttyACM0', 115200)
-    ser.reset_input_buffer()
+    # initialize I2C bus
+    i2c = SMBus(1)
+    time.sleep(1)
 
     # initialize vectors
     mode_k = 9
@@ -30,12 +31,18 @@ def defense():
 
         # 1) send actuator command
         act_kb = u_to_bytes(act_k)
-        ser.write(act_kb)
-        ser.read(size=1)
+        i2c.write_block_data(mega_addr, mega_reg, act_kb)
 
         # 2) receive sensor data
-        ser.write(1)
-        obs_kb = ser.read(size=25)
+        while True:
+            try:
+                obs_kb = i2c.read_i2c_block_data(mega_addr, mega_reg, 2)
+            except:
+                print("i2c error, trying again")
+                continue
+            else:
+                break
+
         obs_k = bytes_to_o(obs_kb)
         
         # 3) enter mode operate

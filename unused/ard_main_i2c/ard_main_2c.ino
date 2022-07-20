@@ -1,7 +1,13 @@
+#include <Wire.h>
 #include "arduinoFFT.h"
 #include <Pixy2.h>
 #include <NewPing.h>
 #include <SparkFun_TB6612.h>
+
+
+// I2C COMM
+
+#define I2C_MEGA_ADDR 0x1a
 
 // MOTORS
 // m1
@@ -26,6 +32,7 @@
 
 #define STNDBY 22 //Connected to VCC
 
+
 const int offsetRB = -1;
 const int offsetLB = 1;
 const int offsetRT = 1;
@@ -37,6 +44,7 @@ Motor RT = Motor(RT1, RT2, RTS, offsetRT, STNDBY);
 Motor LT = Motor(LT1, LT2, LTS, offsetLT, STNDBY);
 
 // USS
+
 #define SONAR_NUM 2      // Number of sensors.
 #define MAX_DISTANCE 30 // Maximum distance (in cm) to ping.
 
@@ -47,12 +55,14 @@ NewPing(46, 22, MAX_DISTANCE), // Each sensor's trigger pin, echo pin, and max d
 NewPing(46, 53, MAX_DISTANCE)};
 
 // SOLENOID
+
 #define SolPin 36
 
 // PIXY
 Pixy2 pixy;
 
 // MIC
+
 bool getStart();
 
 #define SAMPLES 128             //SAMPLES-pt FFT. Must be a base 2 number. Max 128 for Arduino Uno.
@@ -70,59 +80,61 @@ unsigned int samplingPeriod = round(1000000*(1.0/SAMPLING_FREQUENCY)); //Period 
 
 // Initialize buffers
 
-byte req_buffer[9];
-byte rpl_buffer[9];
-
-#define ACT_REQ_LENGTH 9
+byte cmd_buffer[9];
+byte data_buffer[9];
 
 
 void setup() 
 {
-  // SERIAL
-  Serial.begin(115200);
  
   // SOLENOID
   pinMode(SolPin, OUTPUT);
+
+  // I2C
+  Wire.begin(I2C_MEGA_ADDR);
+  Wire.onReceive(receiveData);
+  Wire.onRequest(sendData);
+
+  Serial.begin(115200);
+
 }
 
 void loop() {
-  if (Serial.available() > 0) {
-    req_id = Serial.read();
-    
-    if (req_id == 0) {
-      Serial.readBytes(req_buffer, ACT_REQ_LENGTH);
-      act_request(req_buffer);
-    } else if (req_id == 1) {
-      obs_request();
-    }
-  }
+  // put your main code here, to run repeatedly:  
 }
 
-void act_request(byte req_buffer) {  
-  int p_m1 = (req_buffer[3] << 8) + req_buffer[2];
-  int p_m2 = (req_buffer[5] << 8) + req_buffer[4];
-  int p_m3 = (req_buffer[7] << 8) + req_buffer[6];
-  int p_m4 = (req_buffer[9] << 8) + req_buffer[8];
-  bool solState = req_buffer[10];
+void receiveData(int byte_count) {
+  Serial.println("receiveData()");
+  for (int i=0; i<byte_count; i++) {
+    cmd_buffer[i] = Wire.read();
+//    Serial.println(i2c_data, HEX);
+  }
+  int p_m1 = (cmd_buffer[3] << 8) + cmd_buffer[2];
+  int p_m2 = (cmd_buffer[5] << 8) + cmd_buffer[4];
+  int p_m3 = (cmd_buffer[7] << 8) + cmd_buffer[6];
+  int p_m4 = (cmd_buffer[9] << 8) + cmd_buffer[8];
+  bool solState = cmd_buffer[10];
 
+//  Serial.println(p_m1);
   setMotors(p_m1, p_m2, p_m3, p_m4);
   setSolenoid(solState);
-
-  Serial.write(1);
 }
 
-void obs_request() {
+void sendData() {
+  Serial.println("sendData()");
   // ultra sonic sensor 1
   int d_r0 = getRange(0);
   data_buffer[0] = d_r0;
   data_buffer[1] = d_r0 << 8;
 
+  Serial.println("gate 1");
   // ultra sonic sensor 2
 //  int d_r1 = getRange(1);/
   int d_r1 = 230;
   data_buffer[2] = d_r1;
   data_buffer[3] = d_r1 << 8;
 
+  Serial.println("gate 2");
   // pixy - ball position
   int m1_x = getPixy(1,0);
   data_buffer[4] = m1_x;
@@ -131,6 +143,7 @@ void obs_request() {
   data_buffer[6] = m1_y;
   data_buffer[7] = m1_y << 8;
 
+  Serial.println("gate 3");
   int m_x;
   int m_y;
   
@@ -171,7 +184,7 @@ void obs_request() {
   s_t = getStart();
   data_buffer[24] = s_t;
 
-  Serial.write(data_buffer, 25);
+  Wire.write(data_buffer, 25);
 }
 
 void setMotors(int p_m1,int p_m2,int p_m3,int p_m4) 
