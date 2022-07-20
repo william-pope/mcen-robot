@@ -7,22 +7,22 @@ import numpy as np
 
 from rpi_functions import *
 
-mega_addr = 0x1a
-mega_reg = 0x00
-
 def defense():
     # define constant parameters
     Dt = 0.25  # [s], period of main loop
+    OBS_RPL_LENGTH = 25
     # TO-DO: would like to define a dataclass to hold constants in a struct (or just define as globals?)
 
-    ser = serial.Serial('/dev/ttyACM0', 115200)
+    ser = serial.Serial('/dev/ttyACM1', 115200)
     ser.reset_input_buffer()
+    ser.reset_output_buffer()
+    time.sleep(1)
 
     # initialize vectors
     mode_k = 9
 
     rpm_k = np.zeros(4)
-    act_k = np.append(rpm_k, 0)
+    act_k = np.append(rpm_k, 1)
 
     k_step = 0
     while k_step < 3:
@@ -31,14 +31,24 @@ def defense():
         # 1) send actuator command
         act_kb = u_to_bytes(act_k)
         ser.write(act_kb)
+
+        print("act")
+        print(act_k)
+        print(act_kb)
+
         ser.read(size=1)
 
         # 2) receive sensor data
-        ser.write(1)
-        obs_kb = ser.read(size=25)
-        print(obs_kb)
+        ser.write([0xbb])
 
-        # obs_k = bytes_to_o(obs_kb)
+        obs_kb = ser.read(size=OBS_RPL_LENGTH)
+        obs_k = bytes_to_o(obs_kb)
+
+        print("obs")
+        print(obs_kb)
+        print(obs_k)
+
+        break
         
         # 3) enter mode operate
         if mode_k == 5:
@@ -49,7 +59,7 @@ def defense():
         # test mode
         if mode_k == 9:
             mode_k1 = 9
-            rpm_k1 = 50*np.ones(4)
+            rpm_k1 = 0*np.ones(4)
 
         act_k1 = np.append(rpm_k1, 0)
 

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-from smbus2 import SMBus
 import time
 import copy
 import numpy as np
@@ -121,7 +120,7 @@ def u_to_bytes(act_k):
 
     o_sol_b = int(act_k[4])
 
-    act_kb = [p_m1_b[0], p_m1_b[1], p_m2_b[0], p_m2_b[1], p_m3_b[0], p_m3_b[1], p_m4_b[0], p_m4_b[1], o_sol_b]
+    act_kb = [0xaa, p_m1_b[0], p_m1_b[1], p_m2_b[0], p_m2_b[1], p_m3_b[0], p_m3_b[1], p_m4_b[0], p_m4_b[1], o_sol_b]
     return act_kb
 
 # converts byte package received from Mega into sensor observations
@@ -145,7 +144,7 @@ def bytes_to_o(obs_kb):
     v_blue = int.from_bytes(obs_kba[20:22], "little", signed=True)
     w_blue = int.from_bytes(obs_kba[22:24], "little", signed=True)
 
-    tone = int.from_bytes(obs_kba[24], "little", signed=True)
+    tone = obs_kba[24]
 
     obs_k = [u1, u2, v_ball, w_ball, v_left_post, w_left_post, v_right_post, v_yellow, w_yellow, v_blue, w_blue, w_right_post, tone]
 
