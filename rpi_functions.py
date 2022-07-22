@@ -63,8 +63,16 @@ def control_m6_translate(dv_block):
     elif dv_block < 0:
         direction = "left"
 
+    max_dv = 75
+    speed = np.clip(466 * dv_block/max_dv, -466, 466)
+
+
+    print(dv_block)
+    # print(speed)
+    # print("")
+
     # TO-DO: scale speed proportionally to ball distance
-    rpm_k1 = mec_translate(100, direction)
+    rpm_k1 = mec_translate(0, direction)
 
     return rpm_k1
 
@@ -75,16 +83,16 @@ def mec_translate(speed, direction):
     # convert vehicle speed [mm/sec] to wheel RPM [rev/min]
     #   - max speed is 1077 mm/s (in theory)
     wheel_rpm = np.sqrt(2) * 60 * 1/(np.pi*d_wheel) * speed
-    wheel_rpm = np.clip(wheel_rpm, -300, 300)
+    wheel_rpm = np.clip(wheel_rpm, -130, 130)
 
     if direction == "forward":
-        wheel_rot = [1, 1, 1, 1]
+        wheel_rot = np.array([1, 1, 1, 1])
     elif direction == "backward":
-        wheel_rot = [-1, -1, -1, -1]
+        wheel_rot = np.array([-1, -1, -1, -1])
     elif direction == "left":
-        wheel_rot = [-1, -1, 1, 1]
+        wheel_rot = np.array([-1, 1, 1, -1])
     elif direction == "right":
-        wheel_rot = [1, 1, -1, -1]
+        wheel_rot = np.array([1, -1, -1, 1])
 
     rpm_k1 = wheel_rpm * wheel_rot
 
@@ -113,10 +121,12 @@ def mec_rotate(omega, direction):
 
 # converts input vector to byte package for sending to Mega
 def u_to_bytes(act_k):
-    p_m1_b = int(255/300 * act_k[0]).to_bytes(2, "little", signed=True)     # TO-DO: would like to move RPM scaling onto Arduino
-    p_m2_b = int(255/300 * act_k[1]).to_bytes(2, "little", signed=True)
-    p_m3_b = int(255/300 * act_k[2]).to_bytes(2, "little", signed=True)
-    p_m4_b = int(255/300 * act_k[3]).to_bytes(2, "little", signed=True)
+    max_rpm = 130
+
+    p_m1_b = int(255/max_rpm * act_k[0]).to_bytes(2, "little", signed=True)     # TO-DO: would like to move RPM scaling onto Arduino
+    p_m2_b = int(255/max_rpm * act_k[1]).to_bytes(2, "little", signed=True)
+    p_m3_b = int(255/max_rpm * act_k[2]).to_bytes(2, "little", signed=True)
+    p_m4_b = int(255/max_rpm * act_k[3]).to_bytes(2, "little", signed=True)
 
     o_sol_b = int(act_k[4])
 
@@ -127,25 +137,45 @@ def u_to_bytes(act_k):
 def bytes_to_o(obs_kb):
     obs_kba = bytearray(obs_kb)
 
+    v_frame_offset = 315/2
+    w_frame_offset = 207/2
+    # NOTE: y measurement is from top, but not using
+
     # split byte array into values
     u1 = int.from_bytes(obs_kba[0:2], "little", signed=True)
     u2 = int.from_bytes(obs_kba[2:4], "little", signed=True)
 
-    v_ball = int.from_bytes(obs_kba[4:6], "little", signed=True)
-    w_ball = int.from_bytes(obs_kba[6:8], "little", signed=True)
+    # NOTE: when object not detected, coordinates will show as [-157.5, -103.5]
+    v_ball = int.from_bytes(obs_kba[4:6], "little", signed=True) - v_frame_offset
+    w_ball = int.from_bytes(obs_kba[6:8], "little", signed=True) - w_frame_offset
 
-    v_left_post = int.from_bytes(obs_kba[8:10], "little", signed=True)
-    w_left_post = int.from_bytes(obs_kba[10:12], "little", signed=True)
-    v_right_post = int.from_bytes(obs_kba[12:14], "little", signed=True)
-    w_right_post = int.from_bytes(obs_kba[14:16], "little", signed=True)
+    v_left_post = int.from_bytes(obs_kba[8:10], "little", signed=True) - v_frame_offset
+    w_left_post = int.from_bytes(obs_kba[10:12], "little", signed=True) - w_frame_offset
+    v_right_post = int.from_bytes(obs_kba[12:14], "little", signed=True) - v_frame_offset
+    w_right_post = int.from_bytes(obs_kba[14:16], "little", signed=True) - w_frame_offset
 
-    v_yellow = int.from_bytes(obs_kba[16:18], "little", signed=True)
-    w_yellow = int.from_bytes(obs_kba[18:20], "little", signed=True)
-    v_blue = int.from_bytes(obs_kba[20:22], "little", signed=True)
-    w_blue = int.from_bytes(obs_kba[22:24], "little", signed=True)
+    v_yellow = int.from_bytes(obs_kba[16:18], "little", signed=True) - v_frame_offset
+    w_yellow = int.from_bytes(obs_kba[18:20], "little", signed=True) - w_frame_offset
+    v_blue = int.from_bytes(obs_kba[20:22], "little", signed=True) - v_frame_offset
+    w_blue = int.from_bytes(obs_kba[22:24], "little", signed=True) - w_frame_offset
 
     tone = obs_kba[24]
 
-    obs_k = [u1, u2, v_ball, w_ball, v_left_post, w_left_post, v_right_post, v_yellow, w_yellow, v_blue, w_blue, w_right_post, tone]
+    obs_k = [u1, 
+            u2, 
+            v_ball, w_ball, 
+            v_left_post, w_left_post, 
+            v_right_post, w_right_post, 
+            v_yellow, w_yellow, 
+            v_blue, w_blue, 
+            tone]
+
+    for i in [2,4,6,8,10]:
+        if obs_k[i] == -v_frame_offset:
+            obs_k[i] = 0
+
+    for i in [3,5,7,9,11]:
+        if obs_k[i] == -w_frame_offset:
+            obs_k[i] = 0
 
     return obs_k

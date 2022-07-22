@@ -9,32 +9,29 @@ from rpi_functions import *
 
 def defense():
     # define constant parameters
-    Dt = 0.25  # [s], period of main loop
+    Dt = 0.1  # [s], period of main loop
     OBS_RPL_LENGTH = 25
     # TO-DO: would like to define a dataclass to hold constants in a struct (or just define as globals?)
 
-    ser = serial.Serial('/dev/ttyACM1', 115200)
-    ser.reset_input_buffer()
-    ser.reset_output_buffer()
-    time.sleep(1)
+    time.sleep(5)
 
     # initialize vectors
     mode_k = 9
 
-    rpm_k = np.zeros(4)
+    rpm_k = 0*np.ones(4)
     act_k = np.append(rpm_k, 1)
 
     k_step = 0
-    while k_step < 3:
-        print(k_step)
+    while k_step < 50:
+        # print(k_step)
 
         # 1) send actuator command
         act_kb = u_to_bytes(act_k)
         ser.write(act_kb)
 
-        print("act")
-        print(act_k)
-        print(act_kb)
+        # print("act")
+        # print(act_k)
+        # print(act_kb)
 
         ser.read(size=1)
 
@@ -44,11 +41,11 @@ def defense():
         obs_kb = ser.read(size=OBS_RPL_LENGTH)
         obs_k = bytes_to_o(obs_kb)
 
-        print("obs")
-        print(obs_kb)
-        print(obs_k)
+        # print("obs")
+        # print(obs_kb)
+        # print(obs_k)
 
-        break
+        # print(obs_k[2])
         
         # 3) enter mode operate
         if mode_k == 5:
@@ -61,13 +58,15 @@ def defense():
             mode_k1 = 9
             rpm_k1 = 0*np.ones(4)
 
-        act_k1 = np.append(rpm_k1, 0)
+        act_k1 = np.append(rpm_k1, 1)
 
         mode_k = copy.deepcopy(mode_k1)
         act_k = copy.deepcopy(act_k1)
         k_step += 1
 
-        time.sleep(Dt)
+        # time.sleep(Dt)
+
+    stop_motors()
     
     return
 
@@ -105,7 +104,7 @@ def operate_m5(obs_k):
 # mode 6: follow ball
 def operate_m6(obs_k):
     mode_k1 = 6
-    cam_offset = 15
+    cam_offset = 15     # TO-DO: calibrate this
 
     # OBS: calculate current theta from CV observations
     v_ball = obs_k[2]
@@ -116,7 +115,21 @@ def operate_m6(obs_k):
 
     return mode_k1, rpm_k1
 
+def stop_motors():
+    rpm_k = np.zeros(4)
+    act_k  = np.append(rpm_k, 0)
+    act_kb = u_to_bytes(act_k)
+    ser.write(act_kb)
 
 # main
 if __name__ == "__main__":
-    defense()
+    ser = serial.Serial('/dev/ttyACM0', 115200)
+    ser.reset_input_buffer()
+    ser.reset_output_buffer()
+    time.sleep(1)
+
+    try:
+        defense()
+    except KeyboardInterrupt:
+        stop_motors()
+        print("stopped")

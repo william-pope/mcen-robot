@@ -27,15 +27,22 @@
 
 #define STNDBY 22 //Connected to VCC
 
-const int offsetRB = -1;
-const int offsetLB = 1;
-const int offsetRT = 1;
-const int offsetLT = 1;
+/* m1 - left front
+ * m2 - right front
+ * m3 - left back
+ * m4 - right back
+ */
 
-Motor RB = Motor(RB1, RB2, RBS, offsetRB, STNDBY);
-Motor LB = Motor(LB1, LB2, LBS, offsetLB, STNDBY);
-Motor RT = Motor(RT1, RT2, RTS, offsetRT, STNDBY);
-Motor LT = Motor(LT1, LT2, LTS, offsetLT, STNDBY);
+const int direction_m1 = 1;
+const int direction_m2 = -1;
+const int direction_m3 = 1;
+const int direction_m4 = -1;
+
+Motor m1 = Motor(LT1, LT2, LTS, direction_m1, STNDBY);
+Motor m2 = Motor(RT1, RT2, RTS, direction_m2, STNDBY);
+Motor m3 = Motor(LB1, LB2, LBS, direction_m3, STNDBY);
+Motor m4 = Motor(RB1, RB2, RBS, direction_m4, STNDBY);
+
 
 // SERVO
 Servo servo;
@@ -48,8 +55,9 @@ int servo_pos;
 float factor = sqrt(1.00 + 25.00 / 273.15) / 60.368; // Speed of sound calculation based on temperature.
 
 NewPing sonar[SONAR_NUM] = {   // Sensor object array.
-NewPing(46, 22, MAX_DISTANCE), // Each sensor's trigger pin, echo pin, and max distance to ping. 
-NewPing(46, 53, MAX_DISTANCE)};
+  NewPing(31, 33, MAX_DISTANCE), // Each sensor's trigger pin, echo pin, and max distance to ping. 
+  NewPing(31, 32, MAX_DISTANCE)
+};
 
 // PIXY
 Pixy2 pixy;
@@ -71,12 +79,13 @@ double vImag[SAMPLES]; //create vector of size SAMPLES to hold imaginary values
 unsigned int samplingPeriod = round(1000000*(1.0/SAMPLING_FREQUENCY)); //Period in microseconds 
 
 // Initialize buffers
-
 #define ACT_REQ_LENGTH 9
 #define OBS_RPL_LENGTH 25
 
 byte act_req_buffer[ACT_REQ_LENGTH];
 byte obs_rpl_buffer[OBS_RPL_LENGTH];
+
+byte req_id[1];
 
 void setup() 
 {
@@ -85,14 +94,14 @@ void setup()
  
   // SERVO
   servo.attach(45);
-  servo.write(-10);
+  servo.write(50);
+  delay(3000);
 
+  // PIXY
   pixy.init();
 }
 
-byte req_id[1];
-
-void loop() {  
+void loop() {
   if (Serial.available() > 0) {
     Serial.readBytes(req_id, 1); 
 
@@ -104,8 +113,6 @@ void loop() {
       obs_request();
     }
   }
-
-//  delay(100);
 }
 
 void act_request(byte act_req_buffer[ACT_REQ_LENGTH]) {    
@@ -122,6 +129,9 @@ void act_request(byte act_req_buffer[ACT_REQ_LENGTH]) {
 }
 
 // ISSUE: returns all zeros, make sure bit-shifting is correct
+//  - functions return properly, bit shifting works properly
+//  - issue is with internal sensor calls
+
 void obs_request() {
   // ultra sonic sensor 1
   int d_r0 = getRange(0);
@@ -133,53 +143,42 @@ void obs_request() {
   obs_rpl_buffer[2] = d_r1;
   obs_rpl_buffer[3] = d_r1 >> 8;
 
-  int m_x;
-  int m_y;
-
-  // pixy - ball position
-  m_x = getPixy(1,0);
-  obs_rpl_buffer[4] = m_x;
-  obs_rpl_buffer[5] = m_x >> 8;
+  int* coords_ptr;
   
-  m_y = getPixy(1,1);
-  obs_rpl_buffer[6] = m_y;
-  obs_rpl_buffer[7] = m_y >> 8;
-
-  // pixy - left post
-  m_x = getPixy(2,0);
-  obs_rpl_buffer[8] = m_x;
-  obs_rpl_buffer[9] = m_x >> 8;
-  
-  m_y = getPixy(2,1);
-  obs_rpl_buffer[10] = m_y;
-  obs_rpl_buffer[11] = m_y >> 8;
-
-  // pixy - right post
-  m_x = getPixy(3,0);
-  obs_rpl_buffer[12] = m_x;
-  obs_rpl_buffer[13] = m_x >> 8;
-  
-  m_y = getPixy(3,1);
-  obs_rpl_buffer[14] = m_y;
-  obs_rpl_buffer[15] = m_y >> 8;
-
-  // pixy - gk yellow
-  m_x = getPixy(4,0);
-  obs_rpl_buffer[16] = m_x;
-  obs_rpl_buffer[17] = m_x >> 8;
-  
-  m_y = getPixy(4,1);
-  obs_rpl_buffer[18] = m_y;
-  obs_rpl_buffer[19] = m_y >> 8;
-
-  // pixy - gk blue
-  m_x = getPixy(5,0);
-  obs_rpl_buffer[20] = m_x;
-  obs_rpl_buffer[21] = m_x >> 8;
-  
-//  m_y = getPixy(5,1);
-  obs_rpl_buffer[22] = m_y;
-  obs_rpl_buffer[23] = m_y >> 8;
+  // pixy - ball
+  coords_ptr = getPixy(1);
+  obs_rpl_buffer[4] = coords_ptr[0];
+  obs_rpl_buffer[5] = coords_ptr[0] >> 8;
+  obs_rpl_buffer[6] = coords_ptr[1];
+  obs_rpl_buffer[7] = coords_ptr[1] >> 8;
+//
+//  // pixy - left post
+  coords_ptr = getPixy(2);
+  obs_rpl_buffer[8] = coords_ptr[0];
+  obs_rpl_buffer[9] = coords_ptr[0] >> 8;
+  obs_rpl_buffer[10] = coords_ptr[1];
+  obs_rpl_buffer[11] = coords_ptr[1] >> 8;
+//
+//  // pixy - right post
+  coords_ptr = getPixy(3);
+  obs_rpl_buffer[12] = coords_ptr[0];
+  obs_rpl_buffer[13] = coords_ptr[0] >> 8;
+  obs_rpl_buffer[14] = coords_ptr[1];     // ISSUE
+  obs_rpl_buffer[15] = coords_ptr[1] >> 8;
+//
+//  // pixy - gk yellow
+  coords_ptr = getPixy(4);
+  obs_rpl_buffer[16] = coords_ptr[0];
+  obs_rpl_buffer[17] = coords_ptr[0] >> 8;
+  obs_rpl_buffer[18] = coords_ptr[1];
+  obs_rpl_buffer[19] = coords_ptr[1] >> 8;
+//
+//  // pixy - gk blue
+  coords_ptr = getPixy(5);
+  obs_rpl_buffer[20] = coords_ptr[0];
+  obs_rpl_buffer[21] = coords_ptr[0] >> 8;
+  obs_rpl_buffer[22] = coords_ptr[1];
+  obs_rpl_buffer[23] = coords_ptr[1] >> 8;
 
   // start tone
   bool s_t;
@@ -189,11 +188,11 @@ void obs_request() {
   Serial.write(obs_rpl_buffer, OBS_RPL_LENGTH);
 }
 
-void setMotors(int p_m1,int p_m2,int p_m3,int p_m4) {
-  RB.drive(p_m1);
-  LB.drive(p_m2);
-  RT.drive(p_m3);
-  LT.drive(p_m3);
+void setMotors(int p_m1, int p_m2, int p_m3, int p_m4) {
+  m1.drive(p_m1);
+  m2.drive(p_m2);
+  m3.drive(p_m3);
+  m4.drive(p_m4);
 }
 
 void setServo(bool shoot) {
@@ -205,70 +204,58 @@ void setServo(bool shoot) {
   }
 }
 
-int getRange(int ID) {
-  //sending data in mm
-  int distance = sonar[ID].ping_median(5) * factor * 10; 
+int getRange(uint8_t ID) {
+  int distance = int(sonar[ID].ping_median(5) * factor * 10); // [mm]
   delay(60);  
   
   return distance;
 }
 
-int getPixy(int SIG, int ID) //ID - 0:x and 1:y, Sig - signature of blocl
-{
-//  pixy.init();  
-  
-  int i; //block number
-  int k; //while loop for averagingb
-  int m; //int result value 
-  int getSig; //signature of block
-  int temp_m; //for averaging
-  int result; //return result
+//ID - 0:x and 1:y, Sig - signature of block
+int * getPixy(int sig) {  
 
-  for (int k=0; k<5; k++) {
-    pixy.ccc.getBlocks();
-    
-    if (pixy.ccc.numBlocks) {
-      for (i=0; i<pixy.ccc.numBlocks; i++) {
-        int getSig = pixy.ccc.blocks[i].m_signature;
-        
-        if (SIG == getSig) {
-          if (ID == 0) {
-            int m = pixy.ccc.blocks[i].m_x;
-          }
-          else if (ID == 1) {
-            int m = pixy.ccc.blocks[i].m_y;
-          }
-        }
-        else {
-          int m = 0;
-        }
+  int m; //int result value 
+  int block_sig; //signature of block
+
+  static int result[2];
+
+  pixy.ccc.getBlocks();
+
+  int m_x = 0;
+  int m_y = 0;
+  
+  if (pixy.ccc.numBlocks) {
+    for (int i=0; i<pixy.ccc.numBlocks; i++) {
+      block_sig = pixy.ccc.blocks[i].m_signature;
+      
+      if (block_sig == sig) {
+          m_x = pixy.ccc.blocks[i].m_x;
+          m_y = pixy.ccc.blocks[i].m_y;
       }
+      
     }
-    temp_m = temp_m + m;
-//    delay(10);
+
+    result[0] = m_x;
+    result[1] = m_y;
   }
-    result = temp_m/5;
-    return result;
+  
+  return result;
 }
 
 
-
-bool getStart() 
-{
+bool getStart() {
   bool startTone;
   
-  for(int i=0; i<SAMPLES; i++)
-  {
-      microSeconds = micros();    //Returns the number of microseconds since the Arduino board began running the current script. 
-   
-      vReal[i] = analogRead(0); //Reads the value from analog pin 0 (A0), quantize it and save it as a real term.
-      vImag[i] = 0; //Makes imaginary term 0 always
+  for(int i=0; i<SAMPLES; i++) {
+    microSeconds = micros();    // returns the number of microseconds since the Arduino board began running the current script. 
+ 
+    vReal[i] = analogRead(0); // reads the value from analog pin 0 (A0), quantize it and save it as a real term.
+    vImag[i] = 0; // makes imaginary term 0 always
 
-      /*remaining wait time between samples if necessary*/
-      while(micros() < (microSeconds + samplingPeriod))
-      {
-        //do nothing
-      }
+    /*remaining wait time between samples if necessary*/
+    while(micros() < (microSeconds + samplingPeriod)) {
+      //do nothing
+    }
   }
 
   /*Perform FFT on samples*/
@@ -279,15 +266,12 @@ bool getStart()
   /*Find peak frequency and print peak*/
   double peak = FFT.MajorPeak(vReal, SAMPLES, SAMPLING_FREQUENCY);
 
-  if (peak>startFreq) 
-  {
+  if (peak>startFreq) {
     bool startTone = 1;
   }
-  else 
-  {
+  else {
     bool startTone = 0;
   }
-//  delay(100); // Delay, then loop again
   
   return startTone;
 }
