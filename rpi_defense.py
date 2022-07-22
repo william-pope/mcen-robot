@@ -11,9 +11,6 @@ def defense():
     # define constant parameters
     Dt = 0.1  # [s], period of main loop
     OBS_RPL_LENGTH = 25
-    # TO-DO: would like to define a dataclass to hold constants in a struct (or just define as globals?)
-
-    time.sleep(5)
 
     # initialize vectors
     mode_k = 9
@@ -36,7 +33,7 @@ def defense():
         ser.read(size=1)
 
         # 2) receive sensor data
-        ser.write([0xbb])
+        ser.write([0xb1])
 
         obs_kb = ser.read(size=OBS_RPL_LENGTH)
         obs_k = bytes_to_o(obs_kb)
@@ -64,7 +61,7 @@ def defense():
         act_k = copy.deepcopy(act_k1)
         k_step += 1
 
-        # time.sleep(Dt)
+        time.sleep(Dt)
 
     stop_motors()
     

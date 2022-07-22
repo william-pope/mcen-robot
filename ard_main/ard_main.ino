@@ -4,7 +4,7 @@
 #include <NewPing.h>
 #include <SparkFun_TB6612.h>
 
-// MOTORS
+// motors
 // m1
 #define LTS 2 //Left top motor
 #define LT1 4 //B01
@@ -43,12 +43,11 @@ Motor m2 = Motor(RT1, RT2, RTS, direction_m2, STNDBY);
 Motor m3 = Motor(LB1, LB2, LBS, direction_m3, STNDBY);
 Motor m4 = Motor(RB1, RB2, RBS, direction_m4, STNDBY);
 
-
-// SERVO
+// servo
 Servo servo;
 int servo_pos;
 
-// USS
+// ultrasonic
 #define SONAR_NUM 2      // Number of sensors.
 #define MAX_DISTANCE 30 // Maximum distance (in cm) to ping.
 
@@ -59,11 +58,11 @@ NewPing sonar[SONAR_NUM] = {   // Sensor object array.
   NewPing(31, 32, MAX_DISTANCE)
 };
 
-// PIXY
+// pixy
 Pixy2 pixy;
 
-// MIC
-bool getStart();
+// microphone
+bool getMic();
 
 #define SAMPLES 128             //SAMPLES-pt FFT. Must be a base 2 number. Max 128 for Arduino Uno.
 #define SAMPLING_FREQUENCY 5000 //Ts = Based on Nyquist, must be 2 times the highest expected frequency.
@@ -78,7 +77,7 @@ double vImag[SAMPLES]; //create vector of size SAMPLES to hold imaginary values
  
 unsigned int samplingPeriod = round(1000000*(1.0/SAMPLING_FREQUENCY)); //Period in microseconds 
 
-// Initialize buffers
+// initialize buffers
 #define ACT_REQ_LENGTH 9
 #define OBS_RPL_LENGTH 25
 
@@ -87,17 +86,17 @@ byte obs_rpl_buffer[OBS_RPL_LENGTH];
 
 byte req_id[1];
 
-void setup() 
-{
-  // SERIAL
+
+void setup() {
+  // serial
   Serial.begin(115200);
  
-  // SERVO
+  // servo
   servo.attach(45);
   servo.write(50);
   delay(3000);
 
-  // PIXY
+  // pixy
   pixy.init();
 }
 
@@ -109,8 +108,11 @@ void loop() {
       Serial.readBytes(act_req_buffer, ACT_REQ_LENGTH);
       act_request(act_req_buffer);  
     } 
-    else if (req_id[0] == 0xbb) {
-      obs_request();
+    else if (req_id[0] == 0xb0) {
+      obs_request_offense();
+    }
+    else if (req_id[0] == 0xb1) {
+      obs_request_defense();
     }
   }
 }
@@ -132,7 +134,7 @@ void act_request(byte act_req_buffer[ACT_REQ_LENGTH]) {
 //  - functions return properly, bit shifting works properly
 //  - issue is with internal sensor calls
 
-void obs_request() {
+void obs_request_offense() {
   // ultra sonic sensor 1
   int d_r0 = getRange(0);
   obs_rpl_buffer[0] = d_r0;
@@ -151,29 +153,29 @@ void obs_request() {
   obs_rpl_buffer[5] = coords_ptr[0] >> 8;
   obs_rpl_buffer[6] = coords_ptr[1];
   obs_rpl_buffer[7] = coords_ptr[1] >> 8;
-//
-//  // pixy - left post
+
+  // pixy - left post
   coords_ptr = getPixy(2);
   obs_rpl_buffer[8] = coords_ptr[0];
   obs_rpl_buffer[9] = coords_ptr[0] >> 8;
   obs_rpl_buffer[10] = coords_ptr[1];
   obs_rpl_buffer[11] = coords_ptr[1] >> 8;
-//
-//  // pixy - right post
+
+  // pixy - right post
   coords_ptr = getPixy(3);
   obs_rpl_buffer[12] = coords_ptr[0];
   obs_rpl_buffer[13] = coords_ptr[0] >> 8;
-  obs_rpl_buffer[14] = coords_ptr[1];     // ISSUE
+  obs_rpl_buffer[14] = coords_ptr[1];
   obs_rpl_buffer[15] = coords_ptr[1] >> 8;
-//
-//  // pixy - gk yellow
+
+  // pixy - robot yellow
   coords_ptr = getPixy(4);
   obs_rpl_buffer[16] = coords_ptr[0];
   obs_rpl_buffer[17] = coords_ptr[0] >> 8;
   obs_rpl_buffer[18] = coords_ptr[1];
   obs_rpl_buffer[19] = coords_ptr[1] >> 8;
-//
-//  // pixy - gk blue
+
+  // pixy - robot blue
   coords_ptr = getPixy(5);
   obs_rpl_buffer[20] = coords_ptr[0];
   obs_rpl_buffer[21] = coords_ptr[0] >> 8;
@@ -182,7 +184,35 @@ void obs_request() {
 
   // start tone
   bool s_t;
-  s_t = getStart();
+  s_t = getMic();
+  obs_rpl_buffer[24] = s_t;
+  
+  Serial.write(obs_rpl_buffer, OBS_RPL_LENGTH);
+}
+
+void obs_request_defense() {
+  // set range measurements to zero
+  for (int i=0; i<4, i++) {
+    obs_rpl_buffer[i] = 0x00;
+  }
+
+  int* coords_ptr;
+  
+  // pixy - ball
+  coords_ptr = getPixy(1);
+  obs_rpl_buffer[4] = coords_ptr[0];
+  obs_rpl_buffer[5] = coords_ptr[0] >> 8;
+  obs_rpl_buffer[6] = coords_ptr[1];
+  obs_rpl_buffer[7] = coords_ptr[1] >> 8;
+
+  // set other pixy objects to zero
+  for (int i=8; i<24, i++) {
+    obs_rpl_buffer[i] = 0x00;
+  }
+
+  // start tone
+  bool s_t;
+  s_t = getMic();
   obs_rpl_buffer[24] = s_t;
   
   Serial.write(obs_rpl_buffer, OBS_RPL_LENGTH);
@@ -206,18 +236,17 @@ void setServo(bool shoot) {
 
 int getRange(uint8_t ID) {
   int distance = int(sonar[ID].ping_median(5) * factor * 10); // [mm]
-  delay(60);  
+  delay(50);  
   
   return distance;
 }
 
-//ID - 0:x and 1:y, Sig - signature of block
-int * getPixy(int sig) {  
+int* getPixy(int sig) {  
 
   int m; //int result value 
   int block_sig; //signature of block
 
-  static int result[2];
+  static int coords[2];
 
   pixy.ccc.getBlocks();
 
@@ -232,21 +261,19 @@ int * getPixy(int sig) {
           m_x = pixy.ccc.blocks[i].m_x;
           m_y = pixy.ccc.blocks[i].m_y;
       }
-      
     }
 
-    result[0] = m_x;
-    result[1] = m_y;
+    coords[0] = m_x;    // (?): should this be inside >>if (block_sig == sig) ?
+    coords[1] = m_y;
   }
   
-  return result;
+  return coords;
 }
 
-
-bool getStart() {
-  bool startTone;
+bool getMic() {
+  bool start_tone;
   
-  for(int i=0; i<SAMPLES; i++) {
+  for (int i=0; i<SAMPLES; i++) {
     microSeconds = micros();    // returns the number of microseconds since the Arduino board began running the current script. 
  
     vReal[i] = analogRead(0); // reads the value from analog pin 0 (A0), quantize it and save it as a real term.
@@ -266,12 +293,12 @@ bool getStart() {
   /*Find peak frequency and print peak*/
   double peak = FFT.MajorPeak(vReal, SAMPLES, SAMPLING_FREQUENCY);
 
-  if (peak>startFreq) {
-    bool startTone = 1;
+  if (peak  > startFreq) {
+    bool start_tone = 1;
   }
   else {
-    bool startTone = 0;
+    bool start_tone = 0;
   }
   
-  return startTone;
+  return start_tone;
 }

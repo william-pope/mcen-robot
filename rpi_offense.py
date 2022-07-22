@@ -1,30 +1,15 @@
 #!/usr/bin/env python3
 
-from smbus2 import SMBus
+import serial
 import time
 import copy
 import numpy as np
 
 from rpi_functions import *
 
-mega_addr = 0x1a
-mega_reg = 0x00
-
-
-# TO-DO: 
-#   - test drive functions
-#   - test mode switching
-
-# (?): should create data classes for x, u, o? fields have different data types, so difficult to hold in single array
-
 def offense():
     # define constant parameters
-    Dt = 0.25   # [s], period of main loop
-    # TO-DO: would like to define a dataclass to hold constants in a struct (or just define as globals?)
-
-    # initialize I2C bus
-    i2c = SMBus(1)
-    time.sleep(2)
+    Dt = 0.1   # [s], period of main loop
 
     # initialize vectors
     mode_k = 9
@@ -41,20 +26,15 @@ def offense():
 
         # 1) send actuator command
         act_kb = u_to_bytes(act_k)
-        i2c.write_block_data(mega_addr, mega_reg, act_kb)
+        ser.write(act_kb)
+
+        ser.read(size=1)
 
         # 2) receive sensor data
-        # obs_kb = i2c.read_i2c_block_data(mega_addr, mega_reg, 2)
-        # while True:
-        #     try:
-        #         obs_kb = i2c.read_i2c_block_data(mega_addr, mega_reg, 2)
-        #     except:
-        #         print("i2c error, trying again")
-        #         continue
-        #     else:
-        #         break
+        ser.write([0xb0])
 
-        # obs_k = bytes_to_o(obs_kb)
+        obs_kb = ser.read(size=OBS_RPL_LENGTH)
+        obs_k = bytes_to_o(obs_kb)
         
         # 3) enter mode operate
         shoot_k1 = 0
@@ -83,6 +63,8 @@ def offense():
         k_step += 1
 
         time.sleep(Dt)
+
+    stop_motors()
     
     return
 
@@ -104,7 +86,7 @@ def operate_m0(obs_k):
 
     # MODE: if whistle delay has passed, move on to next mode   # TO-DO: need to store t_w outside function in order to reference in subsequent calls
     if time.now() - t_w >= 0:
-        mode_k1 = 1
+        mode_k1 = 4
         rpm_k1 = np.zeros(4)
         return mode_k1, rpm_k1, target
 
@@ -215,10 +197,24 @@ def operate_m4(obs_k):
     
     return mode_k1, rpm_k1, shoot_k1
 
+def stop_motors():
+    rpm_k = np.zeros(4)
+    act_k  = np.append(rpm_k, 0)
+    act_kb = u_to_bytes(act_k)
+    ser.write(act_kb)
 
 # main
 if __name__ == "__main__":
-    offense()
+    ser = serial.Serial('/dev/ttyACM0', 115200)
+    ser.reset_input_buffer()
+    ser.reset_output_buffer()
+    time.sleep(1)
+
+    try:
+        offense()
+    except KeyboardInterrupt:
+        stop_motors()
+        print("stopped")
 
 
 # terminology:
