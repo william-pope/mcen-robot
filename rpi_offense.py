@@ -41,7 +41,7 @@ def offense():
 
         # print("obs")
         # print(obs_kb)
-        # print(obs_k)
+        print(obs_k)
         
         # 3) enter mode operate
         if mode_k == 0:     # pre-whistle
@@ -88,8 +88,7 @@ def operate_m0(obs_k):
 def operate_m4(obs_k):
     mode_k1 = 4
 
-    # OBS: if goalie moves into target position, wait 5 seconds to see if they leave
-    # ...
+    # time.sleep(45)
 
     # ACT
     rpm_k1 = np.zeros(4)

@@ -68,9 +68,11 @@ Pixy2 pixy;
 #define SAMPLING_FREQUENCY 5000 //Ts = Based on Nyquist, must be 2 times the highest expected frequency.
  
 arduinoFFT FFT = arduinoFFT();
+
+bool mic_enable = true;
  
 unsigned long microSeconds;
-int startFreq = 1500;
+int startFreq = 2000;
 
 double vReal[SAMPLES]; //create vector of size SAMPLES to hold real values
 double vImag[SAMPLES]; //create vector of size SAMPLES to hold imaginary values
@@ -184,9 +186,16 @@ void obs_request_offense() {
   obs_rpl_buffer[22] = coords_ptr[1];
   obs_rpl_buffer[23] = coords_ptr[1] >> 8;
 
+
   // start tone
   bool s_t;
-  s_t = getMic();
+  if (mic_enable == true) {
+    s_t = getMic();
+  } 
+  else if (mic_enable == false) {
+    s_t = 0x01;
+  }
+  
   obs_rpl_buffer[24] = s_t;
   
   Serial.write(obs_rpl_buffer, OBS_RPL_LENGTH);
@@ -214,7 +223,13 @@ void obs_request_defense() {
 
   // start tone
   bool s_t;
-  s_t = getMic();
+  if (mic_enable == true) {
+    s_t = getMic();
+  } 
+  else if (mic_enable == false) {
+    s_t = 0x01;
+  }
+  
   obs_rpl_buffer[24] = s_t;
   
   Serial.write(obs_rpl_buffer, OBS_RPL_LENGTH);
@@ -275,7 +290,7 @@ int* getPixy(int sig) {
 bool getMic() {
   bool start_tone;
 
-  for (int q=0; q<5; q++) {
+  for (int q=0; q<10; q++) {
     for (int i=0; i<SAMPLES; i++) {
       microSeconds = micros();    // returns the number of microseconds since the Arduino board began running the current script. 
    
@@ -298,6 +313,7 @@ bool getMic() {
   
     if (peak > startFreq) {
       start_tone = 1;
+      mic_enable = false;
       return start_tone;
     }
     else {

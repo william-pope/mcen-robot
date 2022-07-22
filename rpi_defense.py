@@ -20,7 +20,7 @@ def defense():
     act_k = np.append(rpm_k, shoot_k)
 
     k_step = 0
-    while k_step < 500:
+    while k_step < 2000:
         print("k: " + str(k_step) + ", mode: " + str(mode_k))
 
         # 1) send actuator command
