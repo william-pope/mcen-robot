@@ -13,14 +13,15 @@ def defense():
     OBS_RPL_LENGTH = 25
 
     # initialize vectors
-    mode_k = 9
+    mode_k = 5
 
     rpm_k = 0*np.ones(4)
-    act_k = np.append(rpm_k, 1)
+    shoot_k = 0
+    act_k = np.append(rpm_k, shoot_k)
 
     k_step = 0
-    while k_step < 50:
-        # print(k_step)
+    while k_step < 500:
+        print("k: " + str(k_step) + ", mode: " + str(mode_k))
 
         # 1) send actuator command
         act_kb = u_to_bytes(act_k)
@@ -33,7 +34,7 @@ def defense():
         # print(act_kb)
 
         # 2) receive sensor data
-        ser.write([0xb1])
+        ser.write([0xdd])
 
         obs_kb = ser.read(size=OBS_RPL_LENGTH)
         obs_k = bytes_to_o(obs_kb)
@@ -41,9 +42,6 @@ def defense():
         # print("obs")
         # print(obs_kb)
         # print(obs_k)
-
-        print("tone: ")
-        print(obs_k[-1])
         
         # 3) enter mode operate
         if mode_k == 5:
@@ -62,7 +60,7 @@ def defense():
         act_k = copy.deepcopy(act_k1)
         k_step += 1
 
-        time.sleep(Dt)
+        # time.sleep(Dt)
 
     stop_motors()
     
@@ -81,16 +79,14 @@ def operate_m5(obs_k):
     mode_k1 = 5
 
     # OBS: check if whistle detected
-    if obs_k[-1] == 1:
-        t_w = time.now()
+    whistle = obs_k[-1]
 
-    # process CV data to track attacker (TBD)
-    # ...
-
-    # MODE: if whistle delay has passed, move on to next mode   # TO-DO: need to store t_w outside function in order to reference in subsequest calls
-    if time.now() - t_w >= 0:
+    # MODE: if whistle heard, transition to shot mode
+    if whistle == True:
         mode_k1 = 6
         rpm_k1 = np.zeros(4)
+
+        print("whistle heard")
         return mode_k1, rpm_k1
 
     # ACT: moved according to random plan, use ball as reference point (TO-DO)s

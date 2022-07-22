@@ -13,17 +13,15 @@ def offense():
     OBS_RPL_LENGTH = 25
 
     # initialize vectors
-    mode_k = 9
+    mode_k = 0
 
     rpm_k = np.zeros(4)
     shoot_k = 0
     act_k = np.append(rpm_k, shoot_k)
 
-    x_dr_k = [0, 0]
-
     k_step = 0
-    while k_step < 3:
-        # print(k_step)
+    while k_step < 500:
+        print("k: " + str(k_step) + ", mode: " + str(mode_k))
 
         # 1) send actuator command
         act_kb = u_to_bytes(act_k)
@@ -36,7 +34,7 @@ def offense():
         # print(act_kb)
 
         # 2) receive sensor data
-        ser.write([0xb0])
+        ser.write([0xff])
 
         obs_kb = ser.read(size=OBS_RPL_LENGTH)
         obs_k = bytes_to_o(obs_kb)
@@ -46,32 +44,16 @@ def offense():
         # print(obs_k)
         
         # 3) enter mode operate
-        shoot_k1 = 0
         if mode_k == 0:     # pre-whistle
-            mode_k1, rpm_k1, target = operate_m0(obs_k)
-        elif mode_k == 1:   # set angle
-            mode_k1, rpm_k1 = operate_m1(obs_k, target)
-        elif mode_k == 2:   # rough distance
-            mode_k1, rpm_k1, x_dr_k1 = operate_m2(obs_k, x_dr_k)
-            x_dr_k = copy.deepcopy(x_dr_k1)
-        elif mode_k == 3:   # fine distance
-            mode_k1, rpm_k1 = operate_m3(obs_k)
-        elif mode_k == 4:   # hold for shot
+            mode_k1, rpm_k1, shoot_k1 = operate_m0(obs_k)
+        elif mode_k == 4:   # take shot
             mode_k1, rpm_k1, shoot_k1 = operate_m4(obs_k)
-
-        # test mode
-        if mode_k == 9:
-            mode_k1 = 9
-            rpm_k1 = 0*np.ones(4)
-            shoot_k1 = 0
 
         act_k1 = np.append(rpm_k1, shoot_k1)
 
         mode_k = copy.deepcopy(mode_k1)
         act_k = copy.deepcopy(act_k1)
         k_step += 1
-
-        time.sleep(Dt)
 
     stop_motors()
     
@@ -84,113 +66,22 @@ def operate_m0(obs_k):
     mode_k1 = 0
 
     # OBS: check if whistle detected
-    if obs_k[-1] == 1:
-        t_w = time.now()
+    whistle = obs_k[-1]
 
-    # process CV data to track goalie (TBD)
-    # ...
-
-    # calculate best shot
-    target = "right"
-
-    # MODE: if whistle delay has passed, move on to next mode   # TO-DO: need to store t_w outside function in order to reference in subsequent calls
-    if time.now() - t_w >= 0:
+    # MODE: if whistle heard, transition to shot mode
+    if whistle == 1:
         mode_k1 = 4
         rpm_k1 = np.zeros(4)
-        return mode_k1, rpm_k1, target
+        shoot_k1 = 0
+
+        print("whistle heard")
+        return mode_k1, rpm_k1, shoot_k1
 
     # ACT: no action in this mode
     rpm_k1 = np.zeros(4)
+    shoot_k1 = 0
 
-    return mode_k1, rpm_k1, target
-
-
-# mode 1: set angle
-def operate_m1(obs_k, target):
-    mode_k1 = 1
-
-    cent_tol = 20       # [px], TO-DO: set these to real values
-    rot_tol = 5         # [px]
-    targ_tol = 10       # [px]
-    v_targ_offset = 30  # [px]
-
-    # OBS: process Pixy data
-    v_ball = obs_k[2]
-    v_left_post = obs_k[4]
-    v_right_post = obs_k[6]
-
-    if target == "left":
-        dv_targ = (v_left_post + v_targ_offset) - v_ball
-
-        if v_left_post == 0:    # if post not recognized, stop and repeat loop
-            rpm_k1 = np.zeros(4)
-            return mode_k1, rpm_k1
-    elif target == "right":
-        dv_targ = (v_right_post - v_targ_offset) - v_ball
-
-        if v_right_post == 0:   # if post not recognized, stop and repeat loop
-            rpm_k1 = np.zeros(4)
-            return mode_k1, rpm_k1
-
-    # MODE: if aligned with target, move on to next mode
-    if abs(v_ball) <= cent_tol and abs(dv_targ) <= targ_tol:
-        mode_k1 = 9     # TEST: end run
-        rpm_k1 = np.zeros(4)
-        return mode_k1, rpm_k1
-
-    # ACT: generate action needed (either rotating or translating)
-    if abs(v_ball) > cent_tol:
-        rpm_k1 = control_m1_rotate(v_ball, rot_tol)
-    else:
-        rpm_k1 = control_m1_translate(dv_targ)
-
-    return mode_k1, rpm_k1
-
-
-# mode 2: set distance (rough)
-def operate_m2(obs_k, x_dr_k):
-    mode_k1 = 2
-
-    x_ref = np.array([30, 20])
-
-    # MODE: if at x_ref, move on to next mode
-    if x_dr_k[1] >= x_ref[1] and x_dr_k[0] >= x_ref[0]:
-        mode_k1 = 3
-        rpm_k1 = np.zeros(4)
-        return mode_k1, rpm_k1
-        
-    # ACT: select action based on dead-reckoning position
-    if x_dr_k[1] < x_ref[1]:
-        rpm_k1 = control_m2_left(x_dr_k, x_ref)
-    elif x_dr_k[1] >= x_ref[1] and x_dr_k[0] < x_ref[0]:
-        rpm_k1 = control_m2_fwd(x_dr_k, x_ref)
-
-    # propagate state
-    x_dr_k1 = [0, 0]
-        
-    return mode_k1, rpm_k1, x_dr_k1
-
-
-# mode 3: set distance (fine)
-def operate_m3(obs_k):
-    mode_k1 = 3
-    x_rel_targ = np.array([78.1, -65.6])  # [mm], distance from robot center to ball center # TO-DO
-    x_rel_tol = 1.5             # [mm], allowable error
-
-    # OBS: calculate relative x-y position from range sensors data
-    x_rel_ball = estimate_m3_ball(obs_k)
-    dx_rel = np.subtract(x_rel_targ, x_rel_ball)
-
-    # MODE: if at target position, move on to next mode
-    if max(np.abs(dx_rel)) <= x_rel_tol:
-        mode_k1 = 4
-        rpm_k1 = np.zeros(4)
-        return mode_k1, rpm_k1
-
-    # ACT: select action based on relative position
-    rpm_k1 = control_m3_translate(dx_rel)
-
-    return mode_k1, rpm_k1
+    return mode_k1, rpm_k1, shoot_k1
 
 
 # mode 4: hold for shot
@@ -202,7 +93,7 @@ def operate_m4(obs_k):
 
     # ACT
     rpm_k1 = np.zeros(4)
-    shoot_k1 = True
+    shoot_k1 = 1
     
     return mode_k1, rpm_k1, shoot_k1
 
@@ -269,3 +160,100 @@ if __name__ == "__main__":
 #       - v_mR: pink marker horizontal position [px] (camera frame)
 #       - w_mR: pink marker vertical position [px] (camera frame)
 #       - tone: whistle heard [bool]
+
+
+# elif mode_k == 1:   # set angle
+#     mode_k1, rpm_k1 = operate_m1(obs_k, target)
+# elif mode_k == 2:   # rough distance
+#     mode_k1, rpm_k1, x_dr_k1 = operate_m2(obs_k, x_dr_k)
+#     x_dr_k = copy.deepcopy(x_dr_k1)
+# elif mode_k == 3:   # fine distance
+#     mode_k1, rpm_k1 = operate_m3(obs_k)
+    
+
+# # mode 1: set angle
+# def operate_m1(obs_k, target):
+#     mode_k1 = 1
+
+#     cent_tol = 20       # [px], TO-DO: set these to real values
+#     rot_tol = 5         # [px]
+#     targ_tol = 10       # [px]
+#     v_targ_offset = 30  # [px]
+
+#     # OBS: process Pixy data
+#     v_ball = obs_k[2]
+#     v_left_post = obs_k[4]
+#     v_right_post = obs_k[6]
+
+#     if target == "left":
+#         dv_targ = (v_left_post + v_targ_offset) - v_ball
+
+#         if v_left_post == 0:    # if post not recognized, stop and repeat loop
+#             rpm_k1 = np.zeros(4)
+#             return mode_k1, rpm_k1
+#     elif target == "right":
+#         dv_targ = (v_right_post - v_targ_offset) - v_ball
+
+#         if v_right_post == 0:   # if post not recognized, stop and repeat loop
+#             rpm_k1 = np.zeros(4)
+#             return mode_k1, rpm_k1
+
+#     # MODE: if aligned with target, move on to next mode
+#     if abs(v_ball) <= cent_tol and abs(dv_targ) <= targ_tol:
+#         mode_k1 = 3     # TEST: end run
+#         rpm_k1 = np.zeros(4)
+#         return mode_k1, rpm_k1
+
+#     # ACT: generate action needed (either rotating or translating)
+#     if abs(v_ball) > cent_tol:
+#         rpm_k1 = control_m1_rotate(v_ball, rot_tol)
+#     else:
+#         rpm_k1 = control_m1_translate(dv_targ)
+
+#     return mode_k1, rpm_k1
+
+
+# # mode 2: set distance (rough)
+# def operate_m2(obs_k, x_dr_k):
+#     mode_k1 = 2
+
+#     x_ref = np.array([30, 20])
+
+#     # MODE: if at x_ref, move on to next mode
+#     if x_dr_k[1] >= x_ref[1] and x_dr_k[0] >= x_ref[0]:
+#         mode_k1 = 3
+#         rpm_k1 = np.zeros(4)
+#         return mode_k1, rpm_k1
+        
+#     # ACT: select action based on dead-reckoning position
+#     if x_dr_k[1] < x_ref[1]:
+#         rpm_k1 = control_m2_left(x_dr_k, x_ref)
+#     elif x_dr_k[1] >= x_ref[1] and x_dr_k[0] < x_ref[0]:
+#         rpm_k1 = control_m2_fwd(x_dr_k, x_ref)
+
+#     # propagate state
+#     x_dr_k1 = [0, 0]
+        
+#     return mode_k1, rpm_k1, x_dr_k1
+
+
+# # mode 4: set distance (fine)
+# def operate_m4(obs_k):
+#     mode_k1 = 4
+#     x_rel_targ = np.array([78.1, -65.6])  # [mm], distance from robot center to ball center # TO-DO
+#     x_rel_tol = 1.5             # [mm], allowable error
+
+#     # OBS: calculate relative x-y position from range sensors data
+#     x_rel_ball = estimate_m3_ball(obs_k)
+#     dx_rel = np.subtract(x_rel_targ, x_rel_ball)
+
+#     # MODE: if at target position, move on to next mode
+#     if max(np.abs(dx_rel)) <= x_rel_tol:
+#         mode_k1 = 5
+#         rpm_k1 = np.zeros(4)
+#         return mode_k1, rpm_k1
+
+#     # ACT: select action based on relative position
+#     rpm_k1 = control_m3_translate(dx_rel)
+
+#     return mode_k1, rpm_k1

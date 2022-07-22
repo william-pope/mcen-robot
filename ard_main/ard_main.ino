@@ -62,7 +62,7 @@ NewPing sonar[SONAR_NUM] = {   // Sensor object array.
 Pixy2 pixy;
 
 // microphone
-bool getMic();
+#define MIC_PIN 0
 
 #define SAMPLES 128             //SAMPLES-pt FFT. Must be a base 2 number. Max 128 for Arduino Uno.
 #define SAMPLING_FREQUENCY 5000 //Ts = Based on Nyquist, must be 2 times the highest expected frequency.
@@ -70,7 +70,7 @@ bool getMic();
 arduinoFFT FFT = arduinoFFT();
  
 unsigned long microSeconds;
-int startFreq = 2000;
+int startFreq = 1500;
 
 double vReal[SAMPLES]; //create vector of size SAMPLES to hold real values
 double vImag[SAMPLES]; //create vector of size SAMPLES to hold imaginary values
@@ -108,10 +108,10 @@ void loop() {
       Serial.readBytes(act_req_buffer, ACT_REQ_LENGTH);
       act_request(act_req_buffer);  
     } 
-    else if (req_id[0] == 0xb0) {
+    else if (req_id[0] == 0xff) {
       obs_request_offense();
     }
-    else if (req_id[0] == 0xb1) {
+    else if (req_id[0] == 0xdd) {
       obs_request_defense();
     }
   }
@@ -194,7 +194,7 @@ void obs_request_offense() {
 
 void obs_request_defense() {
   // set range measurements to zero
-  for (int i=0; i<4, i++) {
+  for (int i=0; i<4; i++) {
     obs_rpl_buffer[i] = 0x00;
   }
 
@@ -208,7 +208,7 @@ void obs_request_defense() {
   obs_rpl_buffer[7] = coords_ptr[1] >> 8;
 
   // set other pixy objects to zero
-  for (int i=8; i<24, i++) {
+  for (int i=8; i<24; i++) {
     obs_rpl_buffer[i] = 0x00;
   }
 
@@ -274,33 +274,38 @@ int* getPixy(int sig) {
 
 bool getMic() {
   bool start_tone;
-  
-  for (int i=0; i<SAMPLES; i++) {
-    microSeconds = micros();    // returns the number of microseconds since the Arduino board began running the current script. 
- 
-    vReal[i] = analogRead(0); // reads the value from analog pin 0 (A0), quantize it and save it as a real term.
-    vImag[i] = 0; // makes imaginary term 0 always
 
-    /*remaining wait time between samples if necessary*/
-    while(micros() < (microSeconds + samplingPeriod)) {
-      //do nothing
+  for (int q=0; q<5; q++) {
+    for (int i=0; i<SAMPLES; i++) {
+      microSeconds = micros();    // returns the number of microseconds since the Arduino board began running the current script. 
+   
+      vReal[i] = analogRead(MIC_PIN); // reads the value from analog pin 0 (A0), quantize it and save it as a real term.
+      vImag[i] = 0; // makes imaginary term 0 always
+  
+      /*remaining wait time between samples if necessary*/
+      while(micros() < (microSeconds + samplingPeriod)) {
+        //do nothing
+      }
+    }
+  
+    /*Perform FFT on samples*/
+    FFT.Windowing(vReal, SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
+    FFT.Compute(vReal, vImag, SAMPLES, FFT_FORWARD);
+    FFT.ComplexToMagnitude(vReal, vImag, SAMPLES);
+  
+    /*Find peak frequency and print peak*/
+    double peak = FFT.MajorPeak(vReal, SAMPLES, SAMPLING_FREQUENCY);
+  
+    if (peak > startFreq) {
+      start_tone = 1;
+      return start_tone;
+    }
+    else {
+      start_tone = 0;
     }
   }
 
-  /*Perform FFT on samples*/
-  FFT.Windowing(vReal, SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
-  FFT.Compute(vReal, vImag, SAMPLES, FFT_FORWARD);
-  FFT.ComplexToMagnitude(vReal, vImag, SAMPLES);
-
-  /*Find peak frequency and print peak*/
-  double peak = FFT.MajorPeak(vReal, SAMPLES, SAMPLING_FREQUENCY);
-
-  if (peak  > startFreq) {
-    bool start_tone = 1;
-  }
-  else {
-    bool start_tone = 0;
-  }
+  // ISSUE: always returns 1
   
   return start_tone;
 }

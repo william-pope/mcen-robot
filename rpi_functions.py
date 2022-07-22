@@ -63,16 +63,17 @@ def control_m6_translate(dv_block):
     elif dv_block < 0:
         direction = "left"
 
-    max_dv = 75
-    speed = np.clip(466 * dv_block/max_dv, -466, 466)
+    # print(direction)
 
+    max_dv = 25
+    speed = np.clip(466 * abs(dv_block)/max_dv, -466, 466)
 
-    print(dv_block)
+    # print(dv_block)
     # print(speed)
     # print("")
 
     # TO-DO: scale speed proportionally to ball distance
-    rpm_k1 = mec_translate(0, direction)
+    rpm_k1 = mec_translate(speed, direction)
 
     return rpm_k1
 
