@@ -26,11 +26,11 @@ def defense():
         act_kb = u_to_bytes(act_k)
         ser.write(act_kb)
 
+        ser.read(size=1)
+
         # print("act")
         # print(act_k)
         # print(act_kb)
-
-        ser.read(size=1)
 
         # 2) receive sensor data
         ser.write([0xb1])
@@ -42,7 +42,8 @@ def defense():
         # print(obs_kb)
         # print(obs_k)
 
-        # print(obs_k[2])
+        print("tone: ")
+        print(obs_k[-1])
         
         # 3) enter mode operate
         if mode_k == 5:
@@ -112,11 +113,13 @@ def operate_m6(obs_k):
 
     return mode_k1, rpm_k1
 
+
 def stop_motors():
     rpm_k = np.zeros(4)
     act_k  = np.append(rpm_k, 0)
     act_kb = u_to_bytes(act_k)
     ser.write(act_kb)
+
 
 # main
 if __name__ == "__main__":

@@ -115,6 +115,8 @@ void loop() {
       obs_request_defense();
     }
   }
+
+  // TO-DO: add timer to shut down motors if no messages received from Pi
 }
 
 void act_request(byte act_req_buffer[ACT_REQ_LENGTH]) {    
